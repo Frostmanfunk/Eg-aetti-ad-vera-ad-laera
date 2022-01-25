@@ -14,7 +14,7 @@ int valueRight;
 int valueLeft;
 int difference;
 
-int counter =0;
+int counter =0; // counts cycles  so we can stop after x cycles
 //
 int trigger = 10; //Necessary difference between the pResists to do something 
 
@@ -36,13 +36,13 @@ void loop() {
   //read lights
   valueRight = analogRead(pResistorRight);
   valueLeft = analogRead(pResistorLeft);
-  difference = valueRight - valueLeft; //take this -10 pls, its just an offset
+  difference = valueRight - valueLeft; 
 
-  //Decide if to turn (PID)
+  //Decide if to turn (PID) //pid not implemented since simple left right is not working yet
 
 
   //run motors
-  if(counter <2){
+  if(counter <2){  //turns of the motors after x number of cycles, will be removed later
   motor1.run(FORWARD);
   motor2.run(FORWARD);
   }
@@ -73,17 +73,6 @@ void loop() {
        Serial.print("straight");
     }
   
-  //valueLight = 500;     // Þurfum að fínstilla þetta fyrir keppni
-
-  /*
-  if (valueLight > 500 ) {
-    Serial.print("Frosti segir hi");
-  }
-  else {
-    Serial.print("Huldar");
-  }
-  */
-
   
   Serial.println("        Difference: " + String(difference) );
   
