@@ -1,6 +1,6 @@
-const int pResistorRight = A1;
-const int pResistorLeft = A2;
-const int ledPin = 9;
+const int pResistorRight = A9;
+const int pResistorLeft = A8;
+const int ledPin = 49;
 
 // Ljósviðnám gildi
 int valueRight;
