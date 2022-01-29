@@ -14,7 +14,11 @@ cap.set(3,frameWidth)
 cap.set(4, frameHeight)
 
 # Configuration for GPIO pins
-RELAY_FAN_GPIO_PIN = 14 # BCM pin used to turn RELAY for FAN ON/OFF
+RELAY_FAN_GPIO_PIN = 4 # BCM pin used to turn RELAY for FAN ON/OFF
+GPIO.setwarnings(False)
+  GPIO.setmode(GPIO.BCM)
+  # Setting up relay for FAN
+  GPIO.setup(RELAY_FAN_GPIO_PIN, GPIO.OUT, initial=GPIO.LOW) # HIGH MEANS LIGHT IS ON
 
 #til að greina umferðarljós er eftirfarandi kóði notaður
 verify_g = 0
@@ -126,7 +130,7 @@ try:
 
         if verify_g >=20 and r_circles is None:
             verify_g = 0 #Hér mun koma kóði sem lætur robotinn fara af stað
-            GPIO.output(RELAY_FAN_GPIO_PIN,GPIO.LOW) # Turn the signal on
+            GPIO.output(RELAY_FAN_GPIO_PIN,GPIO.HIGH) # Turn the signal on
             print("Gó")
 
         #cv2.imshow('detected results', cimg)
