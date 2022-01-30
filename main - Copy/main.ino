@@ -2,7 +2,6 @@
 #include <Servo.h>
 #include <RedBot.h>
 
-
 const int pResistorRight = A9;
 const int pResistorLeft = A8;
 const int ledPin = 49;
