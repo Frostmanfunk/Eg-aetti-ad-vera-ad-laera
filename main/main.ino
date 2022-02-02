@@ -56,6 +56,7 @@ AccelStepper stepper_right(forwardstep2, backwardstep2); // use functions to ste
 // Sets the state of both of the stepper motors to 
 void set_state(char state_in) {
   left_state = state_in;
+  right_state = state_in;
 }
 
 // Loop for stepper thread
@@ -139,8 +140,8 @@ void setup() {
   // Start steppers
   std::thread left_thread (stepper_loop, stepper_left, left_state, 0);
   std::thread right_thread (stepper_loop, stepper_right, right_state, 1);
-  left_thread.join();
-  right_thread.join();
+  left_thread.join(); // Start thread for left stepper
+  right_thread.join();  // Start thread for right stepper
 }
 
 // MAIN LOOP
