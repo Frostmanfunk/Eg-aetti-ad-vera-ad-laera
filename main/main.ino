@@ -10,9 +10,8 @@
 #include <AFMotor.h>
 #include <RedBot.h>
 #include <AccelStepper.h>
-#include <thread> // Til að multithreada stepper motora
-#define SKREFH 2000  // skrefafjöldi í hring (að teknu tilliti til gírkassans)
-#define SKREFL 2000 // skrefafjöldi í hring (að teknu tilliti til gírkassans)
+#define SKREFH 20  // skrefafjöldi í hring (að teknu tilliti til gírkassans)
+#define SKREFL 20 // skrefafjöldi í hring (að teknu tilliti til gírkassans)
 
 // Raspberry pi communication config
 const int raspi_pin = 24
