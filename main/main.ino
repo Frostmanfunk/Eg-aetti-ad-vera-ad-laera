@@ -13,16 +13,21 @@
 #define SKREFH 20  // skrefafjöldi í hring (að teknu tilliti til gírkassans)
 #define SKREFL 20 // skrefafjöldi í hring (að teknu tilliti til gírkassans)
 
-// Raspberry pi communication config
-const int raspi_pin = 24
+// Car config
+// Set state - Used for knowing what the motor wants to do.
+// 's' for STOP, 'g' for GO, 'l' for LEFT, 'r' for RIGHT
+char state = 's';
+char last_state = 's';
 
+// Raspberry pi communication config
+const int raspi_pin = 24;
 
 // IR sensor config
 // Pin setup
-  RedBotSensor IRSensorLeft = RedBotSensor(A15); // initialize a sensor object on A14
-  RedBotSensor IRSensorRight = RedBotSensor(A14); // initialize a sensor object on A15
+RedBotSensor IRSensorLeft = RedBotSensor(A15); // initialize a sensor object on A14
+RedBotSensor IRSensorRight = RedBotSensor(A14); // initialize a sensor object on A15
 int difference; // The difference in the input values from the IR sensors
-const int trigger = 5; //Necessary difference between the pResists to do something 
+const int trigger = 5; //Necessary difference between the pResists to do something
 
 
 // Stepper motor config
@@ -31,98 +36,83 @@ AF_Stepper motor1(SKREFH, 1);
 AF_Stepper motor2(SKREFL, 2);
 const int step_max_speed = 1000;
 const int step_turn_speed_slow = 50;
-// Set state - Used for knowing what the motor wants to do.
-// 's' for STOP, 'g' for GO, 'l' for LEFT, 'r' for RIGHT
-char left_state = 's';
-char right_state = 's';
 
-void forwardstep1() { 
+void forwardstep1() {
   motor1.onestep(BACKWARD, SINGLE);
 }
-void backwardstep1() {  
+void backwardstep1() {
   motor1.onestep(FORWARD, SINGLE);
 }
 
-void forwardstep2() { 
+void forwardstep2() {
   motor2.onestep(FORWARD, SINGLE);
 }
-void backwardstep2() {  
+void backwardstep2() {
   motor2.onestep(BACKWARD, SINGLE);
 }
 
 AccelStepper stepper_left(forwardstep1, backwardstep1); // use functions to step
 AccelStepper stepper_right(forwardstep2, backwardstep2); // use functions to step
 
-// Sets the state of both of the stepper motors to 
-void set_state(char state_in) {
-  left_state = state_in;
-  right_state = state_in;
-}
-
 // Loop for stepper thread
 // Stepper is the motor, state is the motor state, side is which side (0 for left and 1 for right)
-void stepper_loop(stepper, int side) {
-  char state;
-  char last_state = 's';
-
-  //Set initial speed of the motor & stop
-  stepper.setMaxSpeed(step_max_speed);
-  stepper.setSpeed(0);
-
-  // The loop
-  while(1) {
-    if (side) {
-      // Right stepper
-      state = right_state;
-    }
-    else {
-      // Leftstepper
-      state = left_state
-    }
-    if (last_state != state) {
-      switch (state)
-      {
+void run_motors() {
+  if (last_state != state) {
+    switch (state)
+    {
       case 's':
         //STOP
-        stepper.setSpeed(0);
+        stepper_left.setSpeed(0);
+        stepper_right.setSpeed(0);
         break;
       case 'g':
         //GO
-        stepper.setSpeed(step_max_speed);
+        stepper_left.setSpeed(step_max_speed);
+        stepper_right.setSpeed(step_max_speed);
         break;
       case 'l':
         // TURN LEFT
-        if (side) {
-          // Right stepper
-          stepper.setSpeed(step_max_speed);
-        }
-        else {
-          //left stepper
-          stepper.setSpeed(step_turn_speed_slow);
-        }
-        break;    
+        stepper_left.setSpeed(step_turn_speed_slow);
+        stepper_right.setSpeed(step_max_speed);
+        break;
       case 'r':
-        //TURN RIGHT
-        if (side) {
-          // Right stepper
-          stepper.setSpeed(step_turn_speed_slow);
-        }
-        else {
-          //left stepper
-          stepper.setSpeed(step_max_speed);
-        }
+        stepper_left.setSpeed(step_max_speed);
+        stepper_right.setSpeed(step_turn_speed_slow);
         break;
       default:
         // Do nothing
         break;
-      }
     }
-    // Run motor
-    stepper.runSpeed();
-    // Update last state
-    last_state = state;
+  }
+  // Run motor
+  stepper_left.runSpeed();
+  stepper_right.runSpeed();
+  // Update last state
+  last_state = state;
+}
+
+// Function that checks the IR sensors and returns the difference between the values, offset
+int checkIRsensors() {
+  difference = IRSensorLeft.read() - IRSensorRight.read() - 20;
+  return difference;
+}
+
+// Sets the state of the car given the difference of the IR sensors measurement
+void set_state(int difference) {
+  //right turn?
+  if (difference > trigger) {
+    state = 'r';
+  }
+  //left turn?
+  if (difference < -trigger) {
+    state = 'l';
+  }
+  //straight?
+  if (-trigger <= difference && difference <= trigger) {
+    state = 'g';
   }
 }
+
 
 // SETUP
 //---------------------------------------------------------------------------------------------
@@ -138,48 +128,35 @@ void setup() {
 
 
   // Start steppers
-  std::thread left_thread (stepper_loop, stepper_left, left_state, 0);
-  std::thread right_thread (stepper_loop, stepper_right, right_state, 1);
-  left_thread.join(); // Start thread for left stepper
-  right_thread.join();  // Start thread for right stepper
+  char state;
+  char last_state = 's';
+  //Set initial speed of the motor & stop
+  stepper.setMaxSpeed(step_max_speed);
+  stepper.setSpeed(0);
+
 }
 
 // MAIN LOOP
 //---------------------------------------------------------------------------------------------
 void loop() {
-  difference = IRSensorLeft.read() - IRSensorRight.read() - 20; 
+  // Check IR sensors
+  difference = checkIRsensors();
 
-  //Decide if to turn (PID) //pid not implemented since simple left right is not working yet
-
+  // Set state
+  set_state(difference);
 
   //run motors
-  if(counter <1000){  //turns of the motors after x number of cycles, will be removed later
+  if (counter < 1000) { //turns of the motors after x number of cycles, will be removed later
 
-  //right turn?
-   if (difference > trigger){
-     set_state('r');
-    }
-
-   //left turn?
-   if (difference <-trigger){
-     set_state('l');
-    }
-
-   //straight?
-    if (-trigger <=difference && difference <=trigger){
-      set_state('g');
-    }
-
-  // Make the motors run
-  stepper_left.runSpeed();
-  stepper_right.runSpeed();
+    // Make the motors run
+    run_motors();
   }
   if (counter > 1000) {
     exit(0);
   }
-  
+
   //Serial.println("        Difference: " + String(difference) );
-  
+
   //delay(100);    // 0.01 second delay
   //Serial.print(counter);
   counter++;
