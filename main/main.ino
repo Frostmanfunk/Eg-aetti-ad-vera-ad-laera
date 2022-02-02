@@ -10,14 +10,17 @@
 #include <AFMotor.h>
 #include <RedBot.h>
 #include <AccelStepper.h>
-#define SKREFH 20  // skrefafjöldi í hring (að teknu tilliti til gírkassans)
-#define SKREFL 20 // skrefafjöldi í hring (að teknu tilliti til gírkassans)
+#define SKREFH 200  // skrefafjöldi í hring (að teknu tilliti til gírkassans)
+#define SKREFL 200 // skrefafjöldi í hring (að teknu tilliti til gírkassans)
 
 // Car config
 // Set state - Used for knowing what the motor wants to do.
 // 's' for STOP, 'g' for GO, 'l' for LEFT, 'r' for RIGHT
 char state = 's';
 char last_state = 's';
+int turn_counter = 0; // Used to make sure we keep turning when we need turning!
+int counter = 0;
+long startTime;
 
 // Raspberry pi communication config
 const int raspi_pin = 24;
@@ -27,15 +30,15 @@ const int raspi_pin = 24;
 RedBotSensor IRSensorLeft = RedBotSensor(A15); // initialize a sensor object on A14
 RedBotSensor IRSensorRight = RedBotSensor(A14); // initialize a sensor object on A15
 int difference; // The difference in the input values from the IR sensors
-const int trigger = 5; //Necessary difference between the pResists to do something
+const int trigger = 20; //Necessary difference between the pResists to do something
 
 
 // Stepper motor config
 //initiate motors
 AF_Stepper motor1(SKREFH, 1);
 AF_Stepper motor2(SKREFL, 2);
-const int step_max_speed = 1000;
-const int step_turn_speed_slow = 50;
+const int step_max_speed = 50;
+const int step_turn_speed_slow = 20;
 
 void forwardstep1() {
   motor1.onestep(BACKWARD, SINGLE);
@@ -87,8 +90,6 @@ void run_motors() {
   // Run motor
   stepper_left.runSpeed();
   stepper_right.runSpeed();
-  // Update last state
-  last_state = state;
 }
 
 // Function that checks the IR sensors and returns the difference between the values, offset
@@ -99,46 +100,57 @@ int checkIRsensors() {
 
 // Sets the state of the car given the difference of the IR sensors measurement
 void set_state(int difference) {
+  // Update last state
+  last_state = state;
   //right turn?
   if (difference > trigger) {
     state = 'r';
+    turn_counter = 0;
   }
   //left turn?
   if (difference < -trigger) {
     state = 'l';
+    turn_counter = 0;
   }
   //straight?
   if (-trigger <= difference && difference <= trigger) {
     state = 'g';
   }
-}
 
+  // Keep turning if we need to
+  if (last_state == 'l' || last_state == 'r') {
+    if (turn_counter < 200) {
+      state = last_state;
+    }
+  }
+
+}
 
 // SETUP
 //---------------------------------------------------------------------------------------------
 void setup() {
   Serial.begin( 9600 );
+  startTime = millis();
 
   // Pin setup
   pinMode(raspi_pin, INPUT);
 
-  delay(5000);
+  delay(2000);
 
   int counter = 0; // counts cycles  so we can stop after x cycles
 
-
   // Start steppers
-  char state;
-  char last_state = 's';
   //Set initial speed of the motor & stop
-  stepper.setMaxSpeed(step_max_speed);
-  stepper.setSpeed(0);
-
+  stepper_left.setMaxSpeed(step_max_speed);
+  stepper_left.setSpeed(0);
+  stepper_right.setMaxSpeed(step_max_speed);
+  stepper_right.setSpeed(0);
 }
 
 // MAIN LOOP
 //---------------------------------------------------------------------------------------------
 void loop() {
+  
   // Check IR sensors
   difference = checkIRsensors();
 
@@ -146,18 +158,22 @@ void loop() {
   set_state(difference);
 
   //run motors
-  if (counter < 1000) { //turns of the motors after x number of cycles, will be removed later
+  if (counter < 5000) { //turns of the motors after x number of cycles, will be removed later
 
     // Make the motors run
     run_motors();
   }
-  if (counter > 1000) {
+  if (counter > 5000) {
+    Serial.print("Exiting");
     exit(0);
   }
 
-  //Serial.println("        Difference: " + String(difference) );
+  Serial.println("        Difference: " + String(difference) );
+  Serial.println("        turn counter: " + String(turn_counter) );
+  
 
-  //delay(100);    // 0.01 second delay
-  //Serial.print(counter);
+  delay(10);    // 0.01 second delay
+  Serial.print(counter);
   counter++;
+  turn_counter++;   // Update turn counter
 }
