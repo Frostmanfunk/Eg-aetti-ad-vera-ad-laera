@@ -1,8 +1,8 @@
 #include <AFMotor.h>
 #include <RedBot.h>
 #include <AccelStepper.h>
-#define SKREFH 2000  // skrefafjöldi í hring (að teknu tilliti til gírkassans)
-#define SKREFL 2000 // skrefafjöldi í hring (að teknu tilliti til gírkassans)
+#define SKREFH 20  // skrefafjöldi í hring (að teknu tilliti til gírkassans)
+#define SKREFL 20 // skrefafjöldi í hring (að teknu tilliti til gírkassans)
 
 //lesid accelstepper til ad reyna ad skilja hrada styringu
 
@@ -80,7 +80,7 @@ void loop() {
    if (difference > trigger){
       stepper_left.setSpeed(500);
       stepper_right.setSpeed(10);
-      Serial.print("Right");
+      //Serial.print("Right");
     }
 
 
@@ -88,14 +88,14 @@ void loop() {
    if (difference <-trigger){
       stepper_left.setSpeed(10);
       stepper_right.setSpeed(500);
-      Serial.print("left");
+      //Serial.print("left");
     }
 
    //straight?
     if (-trigger <=difference && difference <=trigger){
       stepper_left.setSpeed(500);
       stepper_right.setSpeed(500);
-      Serial.print("straight");
+      //Serial.print("straight");
     }
 
   // Make the motors run
@@ -111,6 +111,6 @@ void loop() {
   Serial.println("        Difference: " + String(difference) );
   
   //delay(100);    // 0.01 second delay
-  Serial.print(counter);
+  //Serial.print(counter);
   counter++;
 }
