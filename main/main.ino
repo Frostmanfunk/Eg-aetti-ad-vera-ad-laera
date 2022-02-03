@@ -16,11 +16,14 @@
 // Car config
 // Set state - Used for knowing what the motor wants to do.
 // 's' for STOP, 'g' for GO, 'l' for LEFT, 'r' for RIGHT
+int task = 0; // Which task the car is working on now. Tasks are on the facebook https://www.facebook.com/HonnunarkeppniHI/photos/pcb.4307788995937099/4307784562604209/
+int last_task;  // The last task
 char state = 's';
 char last_state = 's';
 int turn_counter = 0; // Used to make sure we keep turning when we need turning!
 int counter = 0;
 long startTime;
+bool button_has_been_pressed = false;
 
 // Raspberry pi communication config
 const int raspi_pin = 24;
@@ -31,6 +34,8 @@ RedBotSensor IRSensorLeft = RedBotSensor(A15); // initialize a sensor object on 
 RedBotSensor IRSensorRight = RedBotSensor(A14); // initialize a sensor object on A15
 int difference; // The difference in the input values from the IR sensors
 const int trigger = 20; //Necessary difference between the pResists to do something
+int left_initial;
+int right_initial;
 
 
 // Stepper motor config
@@ -123,15 +128,119 @@ void set_state(int difference) {
       //state = last_state;
     //}
   //}
+}
 
+// Check button press for start
+void check_button_press() {
+  // if button has been pressed {
+    button_has_been_pressed = true;
+  //}
+}
+
+// Updates which task the car is dealing with
+void update_task() {
+  last_task = task;
+  task++;
+  //Serial.println("New task: " + task);
+}
+
+// Does task 1 - The light
+void task1() {
+  // Need to go forward, stop, push button, wait for light to turn green and then the task is complete
+  Serial.println("Starting task 1");
+  // Set state to GO
+  set_state('g');
+
+  // Start timer
+  int timer = millis();
+
+  // Go forward until at right position
+  while ((millis() - timer) < 15000) {
+    run_motors();
+  }
+
+  // Stop
+  set_state('s');
+  run_motors();
+
+  // Push button
+
+  // Wait for light
+
+  // Task complete
+  update_task();
+  Serial.println("Starting task 2");
+  set_state('g');
+}
+
+// Does task 2 - The hill
+void task2() {
+  // Just need to drive normally (do nothing, main loop takes care of line following) until the task is complete
+  // Set state to GO happens in the end of task1() to decrease loop runtime
+
+  // Check if the hill has been conquered
+  //if (task complete {
+    if (true) {
+      update_task();
+    }
+}
+
+// Does task 3 - The roundabout
+void task3() {
+  Serial.println("Starting task 3, currently bailing on this so nothing happens");
+
+  //if task complete {
+    update_task();
+  //}
+}
+
+// Does task 4 - The finish line
+void task4() {
+  Serial.println("Starting task 4");
+  // Set state to GO
+  set_state('g');
+
+  // Drive to end of track
+
+  // Let the hammer fall on the button!
+
+  //if task complete {
+    //update_task();    // Commented out so that the car keeps working while testing
+  //}
+}
+
+// Runs whichever task is supposed to run
+void do_task(int mytask) {
+  switch (mytask) {
+    case 1:
+      task1();
+    break;
+    case 2:
+      task2();
+    break;
+    case 3:
+      task3();      
+    break;
+    case 4:
+      task4();
+    break;
+    default:
+      Serial.println(" All tasks done! Stopping!\n We are the champions my friends! Dun duun!");
+      set_state('s');
+      break;
+    }
 }
 
 // SETUP
 //---------------------------------------------------------------------------------------------
 void setup() {
+  // Begin serial communication
   Serial.begin( 9600 );
+
+  // Timer
   startTime = millis();
-  //state = 'r';
+
+  update_task();
 
   // Pin setup
   pinMode(raspi_pin, INPUT);
@@ -140,17 +249,31 @@ void setup() {
 
   int counter = 0; // counts cycles  so we can stop after x cycles
 
+  // IR sensors
+  left_initial = IRSensorLeft.read();
+  right_initial = IRSensorRight.read();
+  
+
   // Start steppers
   //Set initial speed of the motor & stop
   stepper_left.setMaxSpeed(step_max_speed);
   stepper_left.setSpeed(0);
   stepper_right.setMaxSpeed(step_max_speed);
   stepper_right.setSpeed(0);
+
+
+  // Wait for button press to continue
+  while (!button_has_been_pressed) {
+    check_button_press();
+  }
 }
 
 // MAIN LOOP
 //---------------------------------------------------------------------------------------------
 void loop() {
+  // Check time
+  //Serial.println(millis() - startTime);
+  //startTime = millis();
   
   // Check IR sensors
   difference = checkIRsensors();
@@ -159,19 +282,15 @@ void loop() {
   set_state(difference);
 
   //run motors
-  if (counter < 5000) { //turns of the motors after x number of cycles, will be removed later
+  run_motors();
 
-    // Make the motors run
-    run_motors();
-  }
-  if (counter > 5000) {
-    Serial.print("Exiting");
-    exit(0);
+  // If we have a new task, do that task
+  if (task != last_task) {
+    do_task(task);
   }
 
   //Serial.println("        Difference: " + String(difference) );
-  //Serial.println("        turn counter: " + String(turn_counter) );
-  
+  //Serial.println("        turn counter: " + String(turn_counter) );  
 
   delay(10);    // 0.01 second delay
   //Serial.print(counter);
