@@ -285,9 +285,7 @@ void loop() {
   run_motors();
 
   // If we have a new task, do that task
-  if (task != last_task) {
-    do_task(task);
-  }
+  do_task(task);
 
   //Serial.println("        Difference: " + String(difference) );
   //Serial.println("        turn counter: " + String(turn_counter) );  
