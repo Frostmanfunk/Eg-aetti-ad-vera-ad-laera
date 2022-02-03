@@ -38,7 +38,7 @@ const int trigger = 20; //Necessary difference between the pResists to do someth
 AF_Stepper motor1(SKREFH, 1);
 AF_Stepper motor2(SKREFL, 2);
 const int step_max_speed = 50;
-const int step_turn_speed_slow = 20;
+const int step_turn_speed_slow = -10;//20;
 
 void forwardstep1() {
   motor1.onestep(BACKWARD, SINGLE);
@@ -118,11 +118,11 @@ void set_state(int difference) {
   }
 
   // Keep turning if we need to
-  if (last_state == 'l' || last_state == 'r') {
-    if (turn_counter < 200) {
-      state = last_state;
-    }
-  }
+  //if (last_state == 'l' || last_state == 'r') {
+    //if (turn_counter < 200) {
+      //state = last_state;
+    //}
+  //}
 
 }
 
@@ -131,6 +131,7 @@ void set_state(int difference) {
 void setup() {
   Serial.begin( 9600 );
   startTime = millis();
+  //state = 'r';
 
   // Pin setup
   pinMode(raspi_pin, INPUT);
@@ -168,12 +169,12 @@ void loop() {
     exit(0);
   }
 
-  Serial.println("        Difference: " + String(difference) );
-  Serial.println("        turn counter: " + String(turn_counter) );
+  //Serial.println("        Difference: " + String(difference) );
+  //Serial.println("        turn counter: " + String(turn_counter) );
   
 
   delay(10);    // 0.01 second delay
-  Serial.print(counter);
+  //Serial.print(counter);
   counter++;
   turn_counter++;   // Update turn counter
 }

@@ -2,5 +2,6 @@
     "configuration": "cpu=atmega2560",
     "board": "arduino:avr:mega",
     "port": "COM9",
-    "sketch": "mainStepper\\mainStepper.ino"
+    "sketch": "mainStepper\\mainStepper.ino",
+    "output": "D:\\Huldar\\Documents\\Nám\\HÍ\\2022\\Eg-aetti-ad-vera-ad-laera\\Cache"
 }
