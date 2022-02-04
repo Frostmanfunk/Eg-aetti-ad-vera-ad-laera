@@ -25,14 +25,6 @@ int counter = 0;
 long startTime;
 bool button_has_been_pressed = false;
 
-//afturmotorapinnar
-int in1 = 31;
-int in2 = 33;
-int in3 = 35;
-int in4 = 37 ;
-int speedPinA = 7;
-int speedPinB = 12;
-
 // Raspberry pi communication config
 const int raspi_pin = 24;
 
@@ -41,19 +33,26 @@ const int raspi_pin = 24;
 RedBotSensor IRSensorLeft = RedBotSensor(A15); // initialize a sensor object on A14
 RedBotSensor IRSensorRight = RedBotSensor(A14); // initialize a sensor object on A15
 int difference; // The difference in the input values from the IR sensors
-const int trigger = 20; //Necessary difference between the pResists to do something // 20 for comp
+const int trigger = 20; //Necessary difference between the pResists to do something
 int left_initial;
 int right_initial;
 
-
+//DC motor pin setup7
+const int in1 = 35;
+const int in2 = 37;
+const int in3 = 39;
+const int in4 = 41;
+// DC speed pins
+const int speedPinA = 33;
+const int speedPinB = 43;
 
 
 // Stepper motor config
 //initiate motors
 AF_Stepper motor1(SKREFH, 1);
 AF_Stepper motor2(SKREFL, 2);
-const int step_max_speed = -50;
-const int step_turn_speed_slow = 10;//20;
+const int step_max_speed = 50;
+const int step_turn_speed_slow = 20;//20;
 
 void forwardstep1() {
   motor1.onestep(BACKWARD, SINGLE);
@@ -157,73 +156,58 @@ void update_task() {
 // Does task 1 - The light
 void task1() {
   // Need to go forward, stop, push button, wait for light to turn green and then the task is complete
-  
+  Serial.println("Starting task 1");
+  // Set state to GO
+  set_state('g');
+
+  // Start timer
+  int timer = millis();
 
   // Go forward until at right position
-  if (millis()/1000 <=15) {
-    set_state('g');
+  while ((millis() - timer) < 15000) {
     run_motors();
-    Serial.println("go");
   }
-  else{
-    if (millis()/1000 <=18) {
-    // Stop
-    set_state('s');
-    run_motors();
-    // Push button - stilll missing
-    }
-        else {
-          // Wait for light
-          if(raspi_pin == HIGH || millis()/1000 >=45);{
-            // Task complete
-            Serial.println("Ending task 1");
-            update_task();
-            }
-        }
-  }
-//  Serial.println("Starting task 2");
-//  set_state('g');
+
+  // Stop
+  set_state('s');
+  run_motors();
+
+  // Push button
+
+  // Wait for light
+
+  // Task complete
+  update_task();
+  Serial.println("Starting task 2");
+  set_state('g');
 }
 
-// Does task 2 - Drive to The hill
+// Does task 2 - The hill
 void task2() {
   // Just need to drive normally (do nothing, main loop takes care of line following) until the task is complete
   // Set state to GO happens in the end of task1() to decrease loop runtime
 
   // Check if the hill has been conquered
   //if (task complete {
-    if (millis()/1000 >=100) {
+    if (true) {
       update_task();
     }
 }
 
-
-// Does task 3 - Drive up The hill
+// Does task 3 - The roundabout
 void task3() {
   Serial.println("Starting task 3, currently bailing on this so nothing happens");
-  RearDriveOn();
-  if(millis()/1000 ==150) {
-    RearDriveOff();
+
+  //if task complete {
     update_task();
-  }
+  //}
 }
 
-
-// Does task 4 - The roundabout
+// Does task 4 - The finish line
 void task4() {
-  Serial.println("Starting task 4, currently bailing on this so nothing happens");
-
-  if(millis()/1000 ==250) {
-    update_task();
-  }
-}
-
-// Does task 5 - The finish line
-void task5() {
-  Serial.println("Starting task 5");
+  Serial.println("Starting task 4");
   // Set state to GO
   set_state('g');
-  run_motors();
 
   // Drive to end of track
 
@@ -238,7 +222,7 @@ void task5() {
 void do_task(int mytask) {
   switch (mytask) {
     case 1:
-      task1();
+      //task1();
     break;
     case 2:
       task2();
@@ -248,9 +232,6 @@ void do_task(int mytask) {
     break;
     case 4:
       task4();
-    break;
-    case 5:
-      task5 ();
     break;
     default:
       Serial.println(" All tasks done! Stopping!\n We are the champions my friends! Dun duun!");
@@ -266,7 +247,7 @@ void setup() {
   Serial.begin( 9600 );
 
   // Timer
-  //startTime = millis();
+  startTime = millis();
 
   update_task();
 
@@ -299,7 +280,7 @@ void setup() {
   digitalWrite(in2,HIGH);
   digitalWrite(in3,HIGH);
   digitalWrite(in4,HIGH);
-  //delay(2000); //test til að sjá hvað DC mótorar gera. Má stroka út seinna.
+  delay(2000); //test til að sjá hvað DC mótorar gera. Má stroka út seinna.
 
 
   // Wait for button press to continue
@@ -308,28 +289,21 @@ void setup() {
   }
 }
 
-void RearDriveOn() {
-  digitalWrite(in2,HIGH);
-  digitalWrite(in1,LOW);
-  digitalWrite(in4,HIGH);
-  digitalWrite(in3,LOW);
+
+//////////////////////////////////// fyrir DC motors
+void _mRight(int pin1, int pin2) {
+  digitalWrite(pin1,HIGH);
+  digitalWrite(pin2,LOW);
 }
 
-void RearDriveOff() {
-  digitalWrite(in1,LOW);
-  digitalWrite(in2,LOW);
-  digitalWrite(in3,LOW);
-  digitalWrite(in4,LOW);
+void _mSetSpeed(int pinPWM, int SpeedValue) {
+  analogWrite(pinPWM, SpeedValue);
 }
-
-
-
 /////////////////////////////////
 
 
 
 // MAIN LOOP
-//long startTime1 = millis();
 //---------------------------------------------------------------------------------------------
 void loop() {
   // Check time
@@ -339,27 +313,29 @@ void loop() {
   // Check IR sensors
   difference = checkIRsensors();
 
+  //run DC motors
+  _mRight(in1,in2);
+  _mRight(in3,in4);
+
+  int speed_DC_A = 100;
+  int speed_DC_B = 100;
+  _mSetSpeed(speedPinA,speed_DC_A);
+  _mSetSpeed(speedPinB,speed_DC_B);
 
   // Set state
   set_state(difference);
 
   //run motors
-  
+  run_motors();
 
   // If we have a new task, do that task
   do_task(task);
-  run_motors();
 
-  //Serial.println("        Difference: " + String(difference) );
+  Serial.println("        Difference: " + String(difference) );
   //Serial.println("        turn counter: " + String(turn_counter) );  
 
-  //delay(10);    // 0.01 second delay
-  Serial.println(millis()/1000);
-  
-  //if(millis()/1000 ==100){RearDriveOn();}
-  //if(millis()/1000 ==150){RearDriveOff();}
-  
-  
+  delay(10);    // 0.01 second delay
+  //Serial.print(counter);
   counter++;
   turn_counter++;   // Update turn counter
 }
