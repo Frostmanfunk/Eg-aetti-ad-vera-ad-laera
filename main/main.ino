@@ -223,16 +223,16 @@ void task1() {
   // Stop
   state = 's';
   run_motors();
-
+  myservoFront.write(0);
+  delay(3000);
+  
   // Push button - stilll missing
   // Wait for light
   timer = millis() / 1000;
   Serial.println("waiting for light");
-  while ((millis() / 1000 - timer) <= 10) {
+  while ((millis() / 1000 - timer) <= 20) {
     if (digitalRead(raspi_pin) == HIGH); {
       Serial.println("Raspi");
-      myservoFront.write(0);
-      delay(1000);
       break;
     }
 
@@ -293,14 +293,14 @@ void task4() {
   myservoBack.write(30);
   delay(5000);
   exit(0);
-  
-// Drive to end of track
 
-// Let the hammer fall on the button!
+  // Drive to end of track
 
-//if task complete {
-update_task();    // Commented out so that the car keeps working while testing
-//}
+  // Let the hammer fall on the button!
+
+  //if task complete {
+  update_task();    // Commented out so that the car keeps working while testing
+  //}
 }
 
 // Runs whichever task is supposed to run
