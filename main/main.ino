@@ -12,6 +12,10 @@
 #include <AccelStepper.h>
 #define SKREFH 200  // skrefafjöldi í hring (að teknu tilliti til gírkassans)
 #define SKREFL 200 // skrefafjöldi í hring (að teknu tilliti til gírkassans)
+#include <Servo.h>
+
+Servo myservoFront;
+Servo myservoBack;
 
 // Car config
 // Set state - Used for knowing what the motor wants to do.
@@ -24,6 +28,7 @@ int turn_counter = 0; // Used to make sure we keep turning when we need turning!
 int counter = 0;
 long startTime;
 bool button_has_been_pressed = false;
+int timer;
 
 //afturmotorapinnar
 int in1 = 31;
@@ -38,10 +43,10 @@ const int raspi_pin = 24;
 
 // IR sensor config
 // Pin setup
-RedBotSensor IRSensorLeft = RedBotSensor(A15); // initialize a sensor object on A14
+RedBotSensor IRSensorLeft  = RedBotSensor(A15); // initialize a sensor object on A14
 RedBotSensor IRSensorRight = RedBotSensor(A14); // initialize a sensor object on A15
 int difference; // The difference in the input values from the IR sensors
-const int trigger = 20; //Necessary difference between the pResists to do something // 20 for comp
+const int trigger = 30; //Necessary difference between the pResists to do something // 20 for comp
 int left_initial;
 int right_initial;
 
@@ -53,7 +58,7 @@ int right_initial;
 AF_Stepper motor1(SKREFH, 1);
 AF_Stepper motor2(SKREFL, 2);
 const int step_max_speed = -50;
-const int step_turn_speed_slow = 10;//20;
+const int step_turn_speed_slow = 50;//20;
 
 void forwardstep1() {
   motor1.onestep(BACKWARD, SINGLE);
@@ -69,6 +74,42 @@ void backwardstep2() {
   motor2.onestep(BACKWARD, SINGLE);
 }
 
+
+void RearRightON() {
+  digitalWrite(in2, HIGH);
+  digitalWrite(in1, LOW);
+}
+
+void RearLeftON() {
+  digitalWrite(in4, HIGH);
+  digitalWrite(in3, LOW);
+}
+
+void RearRightBack() {
+  digitalWrite(in1, HIGH);
+  digitalWrite(in2, LOW);
+}
+
+void RearLeftBack() {
+  digitalWrite(in3, HIGH);
+  digitalWrite(in4, LOW);
+}
+
+void RearDriveOn() {
+  digitalWrite(in2, HIGH);
+  digitalWrite(in1, LOW);
+  digitalWrite(in4, HIGH);
+  digitalWrite(in3, LOW);
+}
+
+
+void RearDriveOff() {
+  digitalWrite(in1, LOW);
+  digitalWrite(in2, LOW);
+  digitalWrite(in3, LOW);
+  digitalWrite(in4, LOW);
+}
+
 AccelStepper stepper_left(forwardstep1, backwardstep1); // use functions to step
 AccelStepper stepper_right(forwardstep2, backwardstep2); // use functions to step
 
@@ -82,20 +123,28 @@ void run_motors() {
         //STOP
         stepper_left.setSpeed(0);
         stepper_right.setSpeed(0);
+        //                RearDriveOff();
         break;
       case 'g':
         //GO
         stepper_left.setSpeed(step_max_speed);
         stepper_right.setSpeed(step_max_speed);
+        //                RearDriveOff();
         break;
       case 'l':
         // TURN LEFT
         stepper_left.setSpeed(step_turn_speed_slow);
-        stepper_right.setSpeed(step_max_speed);
+        stepper_right.setSpeed(step_max_speed - 10);
+        //                RearDriveOff();
+        //                RearLeftON();
+        //        RearRightBack();
         break;
       case 'r':
-        stepper_left.setSpeed(step_max_speed);
+        stepper_left.setSpeed(step_max_speed - 10);
         stepper_right.setSpeed(step_turn_speed_slow);
+        //                RearDriveOff();
+        //                RearRightON();
+        //        RearLeftBack();
         break;
       default:
         // Do nothing
@@ -109,7 +158,7 @@ void run_motors() {
 
 // Function that checks the IR sensors and returns the difference between the values, offset
 int checkIRsensors() {
-  difference = IRSensorLeft.read() - IRSensorRight.read() - 10;
+  difference = IRSensorLeft.read() - IRSensorRight.read() + 20;
   return difference;
 }
 
@@ -134,16 +183,16 @@ void set_state(int difference) {
 
   // Keep turning if we need to
   //if (last_state == 'l' || last_state == 'r') {
-    //if (turn_counter < 200) {
-      //state = last_state;
-    //}
+  //if (turn_counter < 200) {
+  //state = last_state;
+  //}
   //}
 }
 
 // Check button press for start
 void check_button_press() {
   // if button has been pressed {
-    button_has_been_pressed = true;
+  button_has_been_pressed = true;
   //}
 }
 
@@ -157,33 +206,47 @@ void update_task() {
 // Does task 1 - The light
 void task1() {
   // Need to go forward, stop, push button, wait for light to turn green and then the task is complete
-  
 
   // Go forward until at right position
-  if (millis()/1000 <=15) {
-    set_state('g');
+  timer = millis() / 1000;
+  while ((millis() / 1000 - timer) <= 3) {
+    //if (millis() / 1000 <= 15) {
+    state = 'g';
     run_motors();
-    Serial.println("go");
+    //Serial.println("go");
+    //Serial.println(state);
+    //}
   }
-  else{
-    if (millis()/1000 <=18) {
-    // Stop
-    set_state('s');
-    run_motors();
-    // Push button - stilll missing
+
+
+
+  // Stop
+  state = 's';
+  run_motors();
+
+  // Push button - stilll missing
+  // Wait for light
+  timer = millis() / 1000;
+  Serial.println("waiting for light");
+  while ((millis() / 1000 - timer) <= 3) {
+    if (digitalRead(raspi_pin) == HIGH); {
+      myservoFront.write(0);
+      myservoBack.write(30);
+      delay(1000);
+      break;
     }
-        else {
-          // Wait for light
-          if(raspi_pin == HIGH || millis()/1000 >=45);{
-            // Task complete
-            Serial.println("Ending task 1");
-            update_task();
-            }
-        }
+
   }
+
+  // Task complete
+  Serial.println("Starting task 2");
+  set_state('g');
+  update_task();
+  timer = millis() / 1000;
+}
 //  Serial.println("Starting task 2");
 //  set_state('g');
-}
+
 
 // Does task 2 - Drive to The hill
 void task2() {
@@ -192,46 +255,51 @@ void task2() {
 
   // Check if the hill has been conquered
   //if (task complete {
-    if (millis()/1000 >=100) {
-      update_task();
-    }
-}
-
-
-// Does task 3 - Drive up The hill
-void task3() {
-  Serial.println("Starting task 3, currently bailing on this so nothing happens");
-  RearDriveOn();
-  if(millis()/1000 ==150) {
-    RearDriveOff();
+  if ((millis() / 1000 - timer) >= 172) {
+    Serial.println("Task 2 done");
     update_task();
+  }
+  else {
+    if ((millis() / 1000 - timer) >= 22) {
+      RearDriveOff();
+    }
+    else {
+
+      RearDriveOn();
+      Serial.println("Task 2 Started");
+      state = 'g';
+
+
+    }
   }
 }
 
 
-// Does task 4 - The roundabout
+// Does task 3 -  The roundabout
+void task3() {
+  //  Serial.println("Starting task 3, currently bailing on this so nothing happens");
+  //  RearDriveOn();
+  //  if ((millis() / 1000 - timer) > 150) {
+  //    RearDriveOff();
+  update_task();
+  //  }
+}
+
+
+// Does task 4 - The finish line
 void task4() {
   Serial.println("Starting task 4, currently bailing on this so nothing happens");
 
-  if(millis()/1000 ==250) {
+  if ((millis() / 1000 - timer) == 250) {
     update_task();
   }
-}
+// Drive to end of track
 
-// Does task 5 - The finish line
-void task5() {
-  Serial.println("Starting task 5");
-  // Set state to GO
-  set_state('g');
-  run_motors();
+// Let the hammer fall on the button!
 
-  // Drive to end of track
-
-  // Let the hammer fall on the button!
-
-  //if task complete {
-    //update_task();    // Commented out so that the car keeps working while testing
-  //}
+//if task complete {
+//update_task();    // Commented out so that the car keeps working while testing
+//}
 }
 
 // Runs whichever task is supposed to run
@@ -239,25 +307,27 @@ void do_task(int mytask) {
   switch (mytask) {
     case 1:
       task1();
-    break;
+      break;
     case 2:
       task2();
-    break;
+      break;
     case 3:
-      task3();      
-    break;
+      task3();
+      break;
     case 4:
       task4();
-    break;
-    case 5:
-      task5 ();
-    break;
+      break;
     default:
       Serial.println(" All tasks done! Stopping!\n We are the champions my friends! Dun duun!");
       set_state('s');
       break;
-    }
+  }
 }
+
+
+
+
+
 
 // SETUP
 //---------------------------------------------------------------------------------------------
@@ -269,18 +339,26 @@ void setup() {
   //startTime = millis();
 
   update_task();
+  update_task(); // taka essa linu
 
   // Pin setup
   pinMode(raspi_pin, INPUT);
 
-  delay(2000);
+
 
   int counter = 0; // counts cycles  so we can stop after x cycles
 
   // IR sensors
   left_initial = IRSensorLeft.read();
   right_initial = IRSensorRight.read();
-  
+
+
+  //Servo
+  myservoFront.attach(9);
+  myservoBack.attach(10);
+  myservoBack.write(89);
+  myservoFront.write(90);
+
 
   // Start steppers
   //Set initial speed of the motor & stop
@@ -290,37 +368,25 @@ void setup() {
   stepper_right.setSpeed(0);
 
   // DC motors setup
-  pinMode(in1,OUTPUT);
-  pinMode(in2,OUTPUT);
-  pinMode(in3,OUTPUT);
-  pinMode(in4,OUTPUT);
+  pinMode(in1, OUTPUT);
+  pinMode(in2, OUTPUT);
+  pinMode(in3, OUTPUT);
+  pinMode(in4, OUTPUT);
 
-  digitalWrite(in1,HIGH);
-  digitalWrite(in2,HIGH);
-  digitalWrite(in3,HIGH);
-  digitalWrite(in4,HIGH);
+  digitalWrite(in1, HIGH);
+  digitalWrite(in2, HIGH);
+  digitalWrite(in3, HIGH);
+  digitalWrite(in4, HIGH);
   //delay(2000); //test til að sjá hvað DC mótorar gera. Má stroka út seinna.
 
-
+  delay(5000);
   // Wait for button press to continue
   while (!button_has_been_pressed) {
     check_button_press();
   }
 }
 
-void RearDriveOn() {
-  digitalWrite(in2,HIGH);
-  digitalWrite(in1,LOW);
-  digitalWrite(in4,HIGH);
-  digitalWrite(in3,LOW);
-}
 
-void RearDriveOff() {
-  digitalWrite(in1,LOW);
-  digitalWrite(in2,LOW);
-  digitalWrite(in3,LOW);
-  digitalWrite(in4,LOW);
-}
 
 
 
@@ -335,7 +401,7 @@ void loop() {
   // Check time
   //Serial.println(millis() - startTime);
   //startTime = millis();
-  
+
   // Check IR sensors
   difference = checkIRsensors();
 
@@ -344,22 +410,24 @@ void loop() {
   set_state(difference);
 
   //run motors
-  
+
 
   // If we have a new task, do that task
   do_task(task);
   run_motors();
 
+
   //Serial.println("        Difference: " + String(difference) );
-  //Serial.println("        turn counter: " + String(turn_counter) );  
+  //Serial.println("        turn counter: " + String(turn_counter) );
 
   //delay(10);    // 0.01 second delay
-  Serial.println(millis()/1000);
-  
+
+  //  Serial.println(millis() / 1000);
+
   //if(millis()/1000 ==100){RearDriveOn();}
   //if(millis()/1000 ==150){RearDriveOff();}
-  
-  
+
+
   counter++;
   turn_counter++;   // Update turn counter
 }
