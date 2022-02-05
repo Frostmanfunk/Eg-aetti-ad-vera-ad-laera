@@ -228,10 +228,10 @@ void task1() {
   // Wait for light
   timer = millis() / 1000;
   Serial.println("waiting for light");
-  while ((millis() / 1000 - timer) <= 3) {
+  while ((millis() / 1000 - timer) <= 10) {
     if (digitalRead(raspi_pin) == HIGH); {
+      Serial.println("Raspi");
       myservoFront.write(0);
-      myservoBack.write(30);
       delay(1000);
       break;
     }
@@ -290,15 +290,16 @@ void task3() {
 void task4() {
   Serial.println("Starting task 4, currently bailing on this so nothing happens");
 
-  if ((millis() / 1000 - timer) == 250) {
-    update_task();
-  }
+  myservoBack.write(30);
+  delay(5000);
+  exit(0);
+  
 // Drive to end of track
 
 // Let the hammer fall on the button!
 
 //if task complete {
-//update_task();    // Commented out so that the car keeps working while testing
+update_task();    // Commented out so that the car keeps working while testing
 //}
 }
 
@@ -320,6 +321,7 @@ void do_task(int mytask) {
     default:
       Serial.println(" All tasks done! Stopping!\n We are the champions my friends! Dun duun!");
       set_state('s');
+      exit(0);
       break;
   }
 }
@@ -339,7 +341,7 @@ void setup() {
   //startTime = millis();
 
   update_task();
-  update_task(); // taka essa linu
+  //update_task(); // taka essa linu
 
   // Pin setup
   pinMode(raspi_pin, INPUT);
