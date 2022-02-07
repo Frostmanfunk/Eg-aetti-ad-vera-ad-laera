@@ -1,0 +1,394 @@
+/* Includes */
+#include "mbed.h"
+#include "rtos.h"
+#include "XNucleoIKS01A3.h"
+
+
+using namespace std;
+
+/* Instantiate the expansion board */
+static XNucleoIKS01A3 *mems_expansion_board = XNucleoIKS01A3::instance(D14, D15, D4, D5, A3, D6, A4);
+
+/* Retrieve the composing elements of the expansion board */
+static STTS751Sensor *t_sensor = mems_expansion_board->t_sensor;
+static LSM6DSOSensor *acc_gyro = mems_expansion_board->acc_gyro;
+
+InterruptIn mybutton(BUTTON1);
+DigitalOut myled(LED1);
+ 
+volatile int mems_event = 0;
+volatile int send_orientation_request = 0;
+uint32_t previous_tick = 0;
+uint32_t current_tick = 0;
+uint8_t high = 0, low = 0;
+float temperature = 0.0f;
+char buffer[32];
+ 
+void INT_cb();
+
+// Create static function to c all uart io's 
+static BufferedSerial pc(USBTX, USBRX);
+
+// write out available commands
+static void instructionMain(void)
+{
+    printf("[1] Start \r\n");
+    printf("[2] Stop \r\n");
+    printf("[3] Reset \r\n");
+    printf("[4] Hringur \r\n");
+    printf("[5] Temp \r\n");   
+}
+
+
+/* Helper function for printing floats & doubles */
+static char *print_double(char *str, double v, int decimalDigits = 2)
+{
+    int i = 1;
+    int intPart, fractPart;
+    int len;
+    char *ptr;
+ 
+    /* prepare decimal digits multiplicator */
+    for (; decimalDigits != 0; i *= 10, decimalDigits--);
+ 
+    /* calculate integer & fractinal parts */
+    intPart = (int)v;
+    fractPart = (int)((v - (double)(int)v) * i);
+ 
+    /* fill in integer part */
+    sprintf(str, "%i.", intPart);
+ 
+    /* prepare fill in of fractional part */
+    len = strlen(str);
+    ptr = &str[len];
+ 
+    /* fill in leading fractional zeros */
+    for (i /= 10; i > 1; i /= 10, ptr++) {
+        if (fractPart >= i) {
+            break;
+        }
+        *ptr = '0';
+    }
+ 
+    /* fill in (rest of) fractional part */
+    sprintf(ptr, "%i", fractPart);
+ 
+    return str;
+}
+
+/* Print the orientation. */
+void send_orientation()
+{
+    uint8_t xl = 0;
+    uint8_t xh = 0;
+    uint8_t yl = 0;
+    uint8_t yh = 0;
+    uint8_t zl = 0;
+    uint8_t zh = 0;
+    int32_t a = 0;
+ 
+    acc_gyro->get_6d_orientation_xl(&xl);
+    acc_gyro->get_6d_orientation_xh(&xh);
+    acc_gyro->get_6d_orientation_yl(&yl);
+    acc_gyro->get_6d_orientation_yh(&yh);
+    acc_gyro->get_6d_orientation_zl(&zl);
+    acc_gyro->get_6d_orientation_zh(&zh);
+    
+    printf("%d,%d,%d,%d,%d,%d",xl,xh,yl,yh,zl,zh);
+ 
+    if (xl == 0 && yl == 0 && zl == 0 && xh == 0 && yh == 1 && zh == 0) {
+        printf("\r\n      ________________  " \
+               "\r\n     |                |_ " \
+               "\r\n  ___|       x          | " \
+               "\r\n |___                   | " \
+               "\r\n     |                  | " \
+               "\r\n     |                  | " \
+               "\r\n     |                 _| " \
+               "\r\n     |________________| \r\n");
+    }
+ 
+    else if (xl == 1 && yl == 0 && zl == 0 && xh == 0 && yh == 0 && zh == 0) {
+        printf("\r\n      ________________  " \
+               "\r\n     |                |_ " \
+               "\r\n  ___|                  | " \
+               "\r\n |___                   | " \
+               "\r\n     |  x               | " \
+               "\r\n     |                  | " \
+               "\r\n     |                 _| " \
+               "\r\n     |________________| \r\n");
+    }
+ 
+    else if (xl == 0 && yl == 0 && zl == 0 && xh == 1 && yh == 0 && zh == 0) {
+        printf("\r\n      ________________  " \
+               "\r\n     |                |_ " \
+               "\r\n  ___|                  | " \
+               "\r\n |___                   | " \
+               "\r\n     |              x   | " \
+               "\r\n     |                  | " \
+               "\r\n     |                 _| " \
+               "\r\n     |________________| \r\n");
+    }
+ 
+    else if (xl == 0 && yl == 1 && zl == 0 && xh == 0 && yh == 0 && zh == 0) {
+        printf("\r\n      ________________  " \
+               "\r\n     |                |_ " \
+               "\r\n  ___|                  | " \
+               "\r\n |___                   | " \
+               "\r\n     |                  | " \
+               "\r\n     |                  | " \
+               "\r\n     |       x         _| " \
+               "\r\n     |________________| \r\n");
+    }
+ 
+    else if (xl == 0 && yl == 0 && zl == 0 && xh == 0 && yh == 0 && zh == 1) {
+        printf("\r\n      ________________  " \
+               "\r\n     |                |_ " \
+               "\r\n  ___|                  | " \
+               "\r\n |___                   | " \
+               "\r\n     |       x          | " \
+               "\r\n     |                  | " \
+               "\r\n     |                 _| " \
+               "\r\n     |________________| \r\n");
+    }
+ 
+    else if (xl == 0 && yl == 0 && zl == 1 && xh == 0 && yh == 0 && zh == 0) {
+        printf("\r\n      ________________  " \
+               "\r\n     |                |_ " \
+               "\r\n     |                  | " \
+               "\r\n     |                  | " \
+               "\r\n     |       O          | " \
+               "\r\n  ___|                  | " \
+               "\r\n |___                 _| " \
+               "\r\n     |________________| \r\n");
+    }
+ 
+    else {
+        printf("None of the 6D orientation axes is set in LSM6DSO - accelerometer.\r\n");
+    }
+}
+
+/* User button callback. */
+void pressed_cb()
+{
+    send_orientation_request = 1;
+}
+ 
+/* Interrupt 1 callback. */
+void int1_cb()
+{
+    mems_event = 1;
+}
+
+
+
+
+
+void Temp()
+{if (mems_event) {
+            mems_event = 0;
+            uint8_t high_temp = 0, low_temp = 0;
+            t_sensor->get_temp_limit_status(&high_temp, &low_temp, NULL);
+            if (high_temp) {
+                high = 1;
+                low = 0;
+            }
+            if (low_temp) {
+                low = 1;
+                high = 0;
+            }
+ 
+            t_sensor->get_temperature(&temperature);
+            myled = 1;
+            ThisThread::sleep_for(100);
+            myled = 0;
+        }
+ 
+        current_tick = clock();
+        if (((current_tick - previous_tick) / 10) >= 5) { //Hversu oft a ad maela og skrifa hita i 0.1 sek
+            if (!high && !low) {
+                t_sensor->get_temperature(&temperature);
+            }
+            printf("Time: %d s   ",current_tick/100);
+            printf("Temp[C]: ");
+            printf("%7s C", print_double(buffer, temperature));
+            if (high) {
+                printf(" High temperature detected!(>28C) \r\n");
+                high = 0;
+            } else if (low) {
+                printf(" Low temperature detected!(<22C) \r\n");
+                low = 0;
+            } else {
+                printf("\r\n");
+            }
+            previous_tick = clock();
+        }}
+
+
+void Halli(){
+    if (mems_event) {
+            mems_event = 0;
+            LSM6DSO_Event_Status_t status;
+            acc_gyro->get_event_status(&status);
+            if (status.D6DOrientationStatus) {
+                /* Send 6D Orientation */
+                send_orientation();
+ 
+                /* Led blinking. */
+                myled = 1;
+                ThisThread::sleep_for(20);
+                myled = 0;
+            }
+        }
+ 
+        if (send_orientation_request) {
+            send_orientation_request = 0;
+            send_orientation();
+        }
+    }
+
+void Hringur(){
+    float y,k;
+        y = 30;
+        float m = 1.5;
+        
+        for (int i = -y*2/3; i <= y*2/3; i++)
+        {
+        for (int j = -y; j <= y; j++)
+        {
+        k = ((i*m)/y)*((i*m)/y) + (j/y)*(j/y);
+        
+        if (i==0 || j==0){
+        printf("\033[0;31m"); //Set the text to the color red
+        printf("*");
+        printf("\033[0m"); //Resets the text to default color
+        }
+        
+        else{
+        if (k >0.15 && k<0.18){
+        printf("*");
+        }
+        else{
+        if (k >0.96 && k<1.05){
+        printf("*");
+        }
+        else{
+        if (i==0 || j==0){
+        printf("\033[0;31m"); //Set the text to the color red
+        printf("*");
+        printf("\033[0m"); //Resets the text to default color
+        }
+        else{
+        printf(" ");
+        }}}}}
+        printf("\r\n");
+        }
+    }
+
+
+
+
+
+
+
+// main
+int main()
+{
+ 
+    /* Attach callback to User button press */
+    mybutton.fall(&pressed_cb);
+    /* Attach callback to LSM6DSO INT1 */
+    acc_gyro->attach_int1_irq(&int1_cb);
+ 
+    /* Enable LSM6DSO accelerometer */
+    acc_gyro->enable_x();
+    /* Enable 6D Orientation. */
+    acc_gyro->enable_6d_orientation();
+    
+    /* Attach callback to STTS751 INT */
+    t_sensor->attach_int_irq(&INT_cb);
+ 
+    /* Enable STTS751 temperature sensor */
+    t_sensor->enable();
+    /* Set ODR to 4Hz */
+    t_sensor->set_odr(4.0f);
+    /* Set Low Temperature Threshold */
+    t_sensor->set_low_temp_thr(22.0f);
+    /* Set High Temperature Threshold */
+    t_sensor->set_high_temp_thr(28.0f);
+    /* Enable Event pin */
+    t_sensor->set_event_pin(1);
+    /* Get beginning status */
+    t_sensor->get_temp_limit_status(NULL, NULL, NULL);
+ 
+    previous_tick = clock();
+ 
+ char buffer[10] = {};
+ char buffer2[10] = {};
+ instructionMain();
+ int t=0;
+ while(1)
+ {
+// do something
+    do{
+    do{
+        if(pc.readable())
+        {
+            pc.read(buffer, 10);
+            strcpy(buffer2, buffer);
+            //pc.read(buffer2, 10);    
+        }
+        else
+        {
+           switch(*buffer2){
+        //////////////////////////////////////////////////////
+        case '5':{
+        //printf("Temp\r\n");
+        Temp();
+        Halli();
+        t=1;
+        
+        
+        break;}
+        } 
+        }
+        }while((*buffer!= '1') && (*buffer!= '2') && (*buffer!= '3')&& (*buffer!= '4')&& (*buffer!= '5'));
+    switch(*buffer){
+        case '1':{
+        printf("Start\r\n");
+        break;}
+        //////////////////////////////////////////////////////////////////
+        case '2':{
+        printf("Stop\r\n");
+        break;}
+        //////////////////////////////////////////////////////////////////
+        case '3':{
+        printf("Reset\r\n");
+        break;}
+        //////////////////////////////////////////////////////////////////
+        case '4':{
+        printf("Hringur\r\n");
+        Hringur();
+        break;}
+        //////////////////////////////////////////////////////
+        case '5':{
+        printf("Temp\r\n");
+        Temp();
+        Halli();
+        t=1;
+        
+        
+        break;}
+        }
+        *buffer = 0;
+        printf("Hello World\r\n");
+        }while(1);
+        
+           
+
+ }  
+}
+
+void INT_cb()
+{
+    mems_event = 1;
+}
